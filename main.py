@@ -23,20 +23,25 @@ class Program():
 
         self.letter_occurences_by_occurence_number()
 
-        self.assign_probability_to_every_word(["based_on_alphabet_contained", ""])
+        self.assign_probability_to_every_word(["based_on_method1", [("i", [3])], [("n", [0])], [("i", [1]), ("k", [2]), ("s", [4])]])
 
     def assign_probability_to_every_word(self, factors):
         all_probabilities = []
         for word in self.all_words_list: # for every word
-            prob = 1
-            for factor in factors: # for every probability factor
-                factor_prob = self.get_factor_probabillity(factor, word) # get the probability from that factor
-                prob *= factor_prob
+            factor_prob = self.get_factor_probabillity(factors, word) # get the probability from that factor
+            prob = factor_prob
+
+        
+            # below was for when every factor was separate, but now it's used as useful data for every method
+
+            # for factor in factors: # for every probability factor
+            #     factor_prob = self.get_factor_probabillity(factor, word) # get the probability from that factor
+            #     prob *= factor_prob
 
             # print(word, prob)
             all_probabilities.append(prob)
             
-        sorted_words = sorted(all_probabilities)
+        sorted_words = sorted(all_probabilities, reverse=True)
 
         print(15, "likeliest words:")
         for item in sorted_words[slice(15)]:
@@ -48,6 +53,80 @@ class Program():
         if factor == "based_on_alphabet_contained":
             frequencies_per_spot = self.frequency_per_spot
             i = 0
+            for letter in word:
+                letter_index = self.alphabet.index(letter)
+                factor_prob *= frequencies_per_spot[i][letter_index]/sum(frequencies_per_spot[i])
+                i += 1
+
+        elif factor == "based_on_alphabet_contained*":
+            frequencies_per_spot = self.frequency_per_spot
+            i = 0
+            check_repeating_letters = set(list(word)) # turn word into a list, then the list into a set (of unique items only)
+
+            if len(check_repeating_letters) != self.word_length: # if there are repeating letters, return 0
+                return 0
+
+            for letter in word:
+                letter_index = self.alphabet.index(letter)
+                factor_prob *= frequencies_per_spot[i][letter_index]/sum(frequencies_per_spot[i])
+                i += 1
+
+        elif factor[0] == "based_on_method1": # method 1: calculates probability of every word, eliminating all impossible cases 
+            frequencies_per_spot = self.frequency_per_spot
+            i = 0
+            black_letters_list = []
+            black_letter_position = []
+                    
+            for black_letter in factor[3]: # for every black letter
+
+                black_letters_list.append("#" + black_letter[0]) # add letter to the list of black letters in this word
+                black_letter_position.append([black_letter[1]]) # make a list of positions for which it's black (at the start it's only one position, but with the abscence or presence of yellow letters it will narrow down)
+
+                for black_letter_pos in black_letter[1]:
+                    if word[black_letter_pos] == black_letter[0]: # if the black letter is in the word, return 0
+                        return 0
+
+            for yellow_letter in factor[2]: # for every yellow letter:
+                if word.count(yellow_letter[0]) < len(yellow_letter[1]): # if there are at least as many yellow letters as there are yellow instances of it, it's good (if there are 2 yellow letters, and in the word there's 2 of them, or 3 of them, or more, then it's good), otherwise return 0
+                    return 0
+
+                if "#" + yellow_letter[0] in black_letters_list: # if yellow letter is also in black letters (we now know how many instances of the letter there are and where it isn't located)
+                    position_index = black_letters_list.index("#" + yellow_letter[0]) # find the letter number in the list
+                    black_letters_list[position_index] = yellow_letter[0] # mark it as checked (it's initially under the format "#X" with X being the letter but set it to "X" to tell that there is indeed another yellow instance of it)
+                    yellow_letter[1].append(black_letter_position[position_index]) # add the black position to the list of yellow positions
+                    black_letter_position[position_index] = yellow_letter[1] # replace black positions with yellow positions (because the letter can't be at those positions)
+
+                for yellow_letter_position in yellow_letter[1]: # for every position of this yellow letter:
+                    if word[yellow_letter_position] == yellow_letter[0]: # if for that position, the letter in the word is the yellow letter (which we established it can't be), return 0:
+                        return 0
+                    
+            for valid_letter in factor[1]: # if valid letters fit at their place, keep word
+
+                if "#" + valid_letter[0] in black_letters_list or valid_letter[0] in black_letters_list: # if yellow letter is also in black letters (we now know how many instances of the letter there are and where it isn't located)
+                    if valid_letter[0] in black_letters_list:
+                        position_index = black_letters_list.index("#" + valid_letter[0])
+                    elif "#" + valid_letter[0] in black_letters_list:
+                        position_index = black_letters_list.index("#" + valid_letter[0]) # find the letter number in the list
+                    black_letters_list[position_index] = valid_letter[0] # mark it as checked (it's initially under the format "#X" with X being the letter but set it to "X" to tell that there is indeed another yellow instance of it)
+                    black_letter_position[position_index] = [0, 1, 2, 3, 4]
+                    for item in valid_letter[1]:
+                        black_letter_position.remove(item)
+
+                for valid_letter_position in valid_letter[1]: # for every position of this valid letter
+                    if word[valid_letter_position] != valid_letter[0]: # check if the valid letter is in the word and fits at that spot, if not return 0:
+                        return 0
+
+            for letter in black_letters_list:
+                if "#" in letter: 
+                    black_letter_position[black_letters_list.index(letter)] = [0, 1, 2, 3, 4] # for every unchecked letter (black and never yellow), make it black everywhere
+                    if letter[1] in word: # if the letter is in the word (letter[0] is "#" and letter[1] is the letter), return 0
+                        print(black_letters_list, word)
+                else:
+                    for i in black_letter_position[black_letters_list.index(letter)]:
+                        for j in i:
+                            if word[j] == letter[1]:
+                                return 0
+
             for letter in word:
                 letter_index = self.alphabet.index(letter)
                 factor_prob *= frequencies_per_spot[i][letter_index]/sum(frequencies_per_spot[i])
@@ -148,8 +227,8 @@ class Program():
                 top_letter = frequency_list.index(sorted_list[k])
                 print(f"{self.alphabet[top_letter]} with a probability of {sorted_list[k]/sum_list}")
 
-            
-                
+    def method_try_next_likeliest(self):
+        pass
 
 Program()
 
